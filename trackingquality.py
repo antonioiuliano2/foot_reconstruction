@@ -18,9 +18,15 @@ nseg = simdf.groupby("TrackID").count()["ID"]
 nsegsamemc = simdf.groupby(["TrackID","MCEvent","MCTrack"]).count()["PID"] #associated to the true MC track
 #taking tracked segments
 trackdf = simdf.query("TrackID>=0")
+#computing npl
+PIDlast = trackdf.groupby("TrackID").min()["PID"]
+PIDfirst = trackdf.groupby("TrackID").max()["PID"]
+npl = (PIDfirst - PIDlast) + 1
 #For each track, take the first segment
 trackdf = simdf.groupby("TrackID").last()
 trackdf["nseg"] = nseg
+trackdf["npl"] = npl
+trackdf["fedraeff"] = nseg/npl
 
 trackdf = trackdf.query("MCEvent>=0")
 
@@ -84,7 +90,11 @@ heffangle.Draw()
 #csplitlength = r.TCanvas()
 #myrootnp.fillhist2D(hsplitlength,trackdf["nsegtrue"],nsplit)
 #hsplitlength.Draw("COLZ")
+#grouping by MCEvent for clarity
+trackdf = trackdf.sort_values("MCEvent")
 
 #printing trackdf
+print (trackdf[["TrackID","MCEvent","MCTrack","nseg","nsegsamemc","nsegtrue","efficiency"]])
+
 
 print(trackdf[["TrackID","MCEvent","MCTrack","nsegtrue","efficiency"]])
