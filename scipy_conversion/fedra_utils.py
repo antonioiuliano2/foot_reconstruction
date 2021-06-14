@@ -41,6 +41,9 @@ def builddataframe(brick, path = "..", cutstring = "1", major = 0, minor = 0, ne
  Pall = np.zeros(0,dtype=np.float32)
  Flagall = np.zeros(0,dtype=int)
 
+ FirstPlateall = np.zeros(0,dtype=int) #added by Giuliana: where does the track end?
+ LastPlateall = np.zeros(0,dtype=int)
+
  print ("Cut on couples ")
  cut.Print()
 
@@ -81,6 +84,9 @@ def builddataframe(brick, path = "..", cutstring = "1", major = 0, minor = 0, ne
   Parray_plate = np.zeros(nsegcut,dtype=np.float32)
   Flagarray_plate = np.zeros(nsegcut,dtype=int)
 
+  FirstPlatearray_plate = np.zeros(nsegcut,dtype=int)
+  LastPlatearray_plate = np.zeros(nsegcut,dtype=int)
+
   print ("loop on {} segments over  {} for plate {}".format(nsegcut, nseg,nplate))
   for ientry in range(nsegcut):
    iseg = cutlist.GetEntry(ientry)
@@ -110,7 +116,10 @@ def builddataframe(brick, path = "..", cutstring = "1", major = 0, minor = 0, ne
    if charmsim: #different place where pdgcode is stored
     Flagarray_plate[ientry] = seg.Vid(0)
    else:
-    Flagarray_plate[ientry] = seg.Flag()  
+    Flagarray_plate[ientry] = seg.Flag()
+   
+   FirstPlatearray_plate[ientry] = seg.Vid(0)
+   LastPlatearray_plate[ientry] = seg.Vid(1)  
 
   #end of loop, storing them in global arrays
   IDall = np.concatenate((IDall,IDarray_plate),axis=0)
@@ -126,8 +135,11 @@ def builddataframe(brick, path = "..", cutstring = "1", major = 0, minor = 0, ne
   Pall = np.concatenate((Pall,Parray_plate),axis=0)
   Flagall = np.concatenate((Flagall,Flagarray_plate),axis=0)
 
- data = {'ID':IDall,'PID':PIDall,'x':xall,'y':yall,'z':zall,'TX':TXall,'TY':TYall,'MCEvent':MCEvtall,'MCTrack':MCTrackall,'P':Pall,'Flag':Flagall}
- df = pd.DataFrame(data, columns = ['ID','PID','x','y','z','TX','TY','MCEvent','MCTrack','P','Flag'] )
+  FirstPlateall = np.concatenate((FirstPlateall, FirstPlatearray_plate),axis=0)
+  LastPlateall = np.concatenate((LastPlateall, LastPlatearray_plate),axis=0)
+
+ data = {'ID':IDall,'PID':PIDall,'x':xall,'y':yall,'z':zall,'TX':TXall,'TY':TYall,'MCEvent':MCEvtall,'MCTrack':MCTrackall,'P':Pall,'Flag':Flagall, "FirstPlate":FirstPlateall,"LastPlate":LastPlateall}
+ df = pd.DataFrame(data, columns = ['ID','PID','x','y','z','TX','TY','MCEvent','MCTrack','P','Flag',"FirstPlate","LastPlate"] )
 
  return df
 
