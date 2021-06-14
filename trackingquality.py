@@ -22,13 +22,15 @@ trackdf = simdf.query("TrackID>=0")
 PIDlast = trackdf.groupby("TrackID").min()["PID"]
 PIDfirst = trackdf.groupby("TrackID").max()["PID"]
 npl = (PIDfirst - PIDlast) + 1
-#For each track, take the first segment
-trackdf = simdf.groupby("TrackID").last()
+#For each track, take the first segment, accept them if they have at least one segment Monte Carlo
+trackdf["simulation"] = trackdf["MCEvent"]>=0 
+atleastonemc = trackdf.groupby("TrackID").any()["simulation"] #at least one segment coming from simulation
+trackdf = trackdf.groupby("TrackID").last()
 trackdf["nseg"] = nseg
 trackdf["npl"] = npl
 trackdf["fedraeff"] = nseg/npl
 
-trackdf = trackdf.query("MCEvent>=0")
+trackdf = trackdf[atleastonemc]
 
 maxnseg = int(np.max(nseg))
 #group by same MCTrack and MCEvent
