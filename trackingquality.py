@@ -9,20 +9,22 @@ import sys
 '''launch with ipython -i trackinquality.py nsection'''
 nsection = sys.argv[1] #1,2, 3, 4,5,6,7
 
-setfile = r.TFile.Open("b000001.{}.0.0.set.root".format(nsection))
-footset = setfile.Get("set")
+def GetSectionBorders(nsection):
+   '''returns first and last plate of this section'''
+   setfile = r.TFile.Open("b000001.{}.0.0.set.root".format(nsection))
+   footset = setfile.Get("set")
+   nplates = footset.eIDS.GetSize()
+   lastplateset = footset.GetID(0).ePlate
+   firstplateset = footset.GetID(nplates-1).ePlate
+   print("Opened set of section {}, first plate is {}, last plate is {}".format(nsection,firstplateset, lastplateset))
+   return firstplateset, lastplateset
 
-#def getPlatebyPID(df):
-# '''getting plate by pID, according to set'''
-# return footset.GetID(int(df.PID)).ePlate
-
-lastplateset = footset.GetID(0).ePlate
-print("Opened set of section {}, last plate is {}".format(nsection,lastplateset))
-
+firstplateset, lastplateset = GetSectionBorders(nsection)
 
 print("Processing Data Frame for section {}".format(nsection))
+#df = pd.read_csv("GSI1_S{}_standard.csv".format(nsection))
 df = pd.read_csv("GSI1_S{}.csv".format(nsection))
-#df["Plate"] = df.apply(getPlatebyPID,axis=1) #getting plate by pID
+df["Plate"] = lastplateset - df["PID"] #getting plate by pID (we assume no plates are skipped)
 
 simdf = df.query("MCTrack>=0 or TrackID>=0") #segments tracked or from the simulation
 simdf["Theta"] = np.arctan(np.sqrt(simdf["TX"] * simdf["TX"] + simdf["TY"] * simdf["TY"]))
@@ -41,10 +43,9 @@ trackdf["simulation"] = trackdf["MCEvent"]>=0
 atleastonemc = trackdf.groupby("TrackID").any()["simulation"] #at least one segment coming from simulation
 
 #which are the most frequent MonteCarlo Event and Track for this reconstructed track?
-#mostfrequentevent = trackdf.query("MCEvent>=0").groupby(['TrackID'])['MCEvent'].agg(pd.Series.mode)
-#mostfrequenttrack = trackdf.query("MCTrack>=0").groupby(['TrackID'])['MCTrack'].agg(pd.Series.mode) #mode is not ok, returns only values present at least twice
 mostfrequentevent = trackdf.query("MCEvent>=0").groupby(['TrackID'])['MCEvent'].agg(lambda x:x.value_counts().index[0])
 mostfrequenttrack = trackdf.query("MCEvent>=0").groupby(['TrackID'])['MCTrack'].agg(lambda x:x.value_counts().index[0])
+endmostfrequenttrack = trackdf.query("MCEvent>=0").groupby(['TrackID'])['LastPlate'].agg(lambda x:x.value_counts().index[0])
 
 trackdf = trackdf.groupby("TrackID").last()
 
@@ -54,6 +55,10 @@ trackdf["npl"] = npl
 trackdf["fedraeff"] = nseg/npl
 trackdf["MostCommonMCEvent"] = mostfrequentevent
 trackdf["MostCommonMCTrack"] = mostfrequenttrack
+
+#replacing value with most common MCTrack information
+del trackdf["LastPlate"]
+trackdf["LastPlate"] = endmostfrequenttrack
 
 trackdf = trackdf[atleastonemc]
 
@@ -66,8 +71,8 @@ maxnsegtrue = int(np.max(nsegtrue))
 #let us consider now signal segments which have been tracked
 simtrackdf = simdf.query("TrackID>=0")
 #grouping by MCEvent and MCTrack, we can get where the track ends (even counting splitting in different reco tracks)
-simtrackdf = simtrackdf.sort_values("PID")
-lastplateMCTrack = simtrackdf.groupby(["MCEvent","MCTrack"]).first()["PID"]
+simtrackdf = simtrackdf.sort_values("Plate")
+lastplateMCTrack = simtrackdf.groupby(["MCEvent","MCTrack"]).last()["Plate"]
 
 #merging the MCTrue information in trackID, according to most common MCEvent and MCTrack
 nsegtrue = nsegtrue.reset_index()
@@ -107,8 +112,8 @@ del trackdf["PID_y"]
 del trackdf["PID_x"]
 
 trackdf = trackdf.reset_index().merge(lastplateMCTrack, how = "left", on = ["MostCommonMCEvent","MostCommonMCTrack"])
-trackdf["PID"] = trackdf["PID_x"]
-trackdf["lastplateMCTrack"] = trackdf["PID_y"]
+trackdf["Plate"] = trackdf["Plate_x"]
+trackdf["lastplateMCTrack"] = trackdf["Plate_y"]
 
 print("end preparation of dataframe, making plots")
 
@@ -152,8 +157,9 @@ heffangle.Draw()
 #grouping by MCEvent for clarity
 trackdf = trackdf.sort_values("MCEvent")
 
-#printing trackdf
-print (trackdf[["TrackID","MCEvent","MCTrack","nseg","nsegsamemc","nsegtrue","efficiency"]])
-
-
+#printing trackdf and some information
 print(trackdf[["TrackID","MCEvent","MCTrack","nsegtrue","efficiency"]])
+
+
+print("len(trackdf) = {}".format(len(trackdf)))
+print("len(trackdf.query(nsegsamemc<nseg)) = {}".format(len(trackdf.query("nsegsamemc<nseg"))))
