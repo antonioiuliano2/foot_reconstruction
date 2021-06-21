@@ -1,8 +1,8 @@
 from __future__ import division
 import pandas as pd
 import ROOT as r
+import fedrarootlogon
 from scipy import stats
-import fedra_utils as feutils
 import numpy as np
 import rootnumpy_myutils as myrootnp
 import sys
@@ -53,12 +53,15 @@ trackdf = trackdf.groupby("TrackID").last()
 trackdf["nseg"] = nseg
 trackdf["npl"] = npl
 trackdf["fedraeff"] = nseg/npl
-trackdf["MostCommonMCEvent"] = mostfrequentevent
-trackdf["MostCommonMCTrack"] = mostfrequenttrack
 
-#replacing value with most common MCTrack information
+print("replacing MCEvent,MCTrack and LastPlate values in trackdf with information from most common MCEvent and MCTrack")
 del trackdf["LastPlate"]
 trackdf["LastPlate"] = endmostfrequenttrack
+
+del trackdf["MCEvent"]
+del trackdf["MCTrack"]
+trackdf["MCEvent"] = mostfrequentevent
+trackdf["MCTrack"] = mostfrequenttrack
 
 trackdf = trackdf[atleastonemc]
 
@@ -79,26 +82,8 @@ nsegtrue = nsegtrue.reset_index()
 nsegsamemc = nsegsamemc.reset_index()
 lastplateMCTrack = lastplateMCTrack.reset_index()
 
-nsegtrue["MostCommonMCEvent"] = nsegtrue["MCEvent"]
-nsegtrue["MostCommonMCTrack"] = nsegtrue["MCTrack"]
-
-del nsegtrue["MCEvent"]
-del nsegtrue["MCTrack"]
-
-nsegsamemc["MostCommonMCEvent"] = nsegsamemc["MCEvent"]
-nsegsamemc["MostCommonMCTrack"] = nsegsamemc["MCTrack"]
-
-del nsegsamemc["MCEvent"]
-del nsegsamemc["MCTrack"]
-
-lastplateMCTrack["MostCommonMCEvent"] = lastplateMCTrack["MCEvent"]
-lastplateMCTrack["MostCommonMCTrack"] = lastplateMCTrack["MCTrack"]
-
-del lastplateMCTrack["MCEvent"]
-del lastplateMCTrack["MCTrack"]
-
-trackdf = trackdf.reset_index().merge(nsegtrue, how = "left", on = ["MostCommonMCEvent","MostCommonMCTrack"])
-trackdf = trackdf.reset_index().merge(nsegsamemc, how = "left", on = ["TrackID","MostCommonMCEvent","MostCommonMCTrack"])
+trackdf = trackdf.reset_index().merge(nsegtrue, how = "left", on = ["MCEvent","MCTrack"])
+trackdf = trackdf.reset_index().merge(nsegsamemc, how = "left", on = ["TrackID","MCEvent","MCTrack"])
 
 #renaming labels
 trackdf["PID"] = trackdf["PID_x"]
@@ -111,7 +96,7 @@ del trackdf["ID_x"]
 del trackdf["PID_y"]
 del trackdf["PID_x"]
 
-trackdf = trackdf.reset_index().merge(lastplateMCTrack, how = "left", on = ["MostCommonMCEvent","MostCommonMCTrack"])
+trackdf = trackdf.reset_index().merge(lastplateMCTrack, how = "left", on = ["MCEvent","MCTrack"])
 trackdf["Plate"] = trackdf["Plate_x"]
 trackdf["lastplateMCTrack"] = trackdf["Plate_y"]
 
@@ -121,7 +106,7 @@ print("end preparation of dataframe, making plots")
 trackdf["efficiency"] = trackdf["nsegsamemc"]/trackdf["nsegtrue"]
 
 #how many reco tracks for each true track?
-nsplit = trackdf.groupby(["MostCommonMCEvent","MostCommonMCTrack"]).count()["ID"]
+nsplit = trackdf.groupby(["MCEvent","MCTrack"]).count()["ID"]
 
 #making histograms, drawing them
 hsplit = r.TH1I("hsplit","number of reconstructed tracks for each true track;Nsplit",10,1,10)
@@ -163,3 +148,62 @@ print(trackdf[["TrackID","MCEvent","MCTrack","nsegtrue","efficiency"]])
 
 print("len(trackdf) = {}".format(len(trackdf)))
 print("len(trackdf.query(nsegsamemc<nseg)) = {}".format(len(trackdf.query("nsegsamemc<nseg"))))
+
+
+#selecteddf = df.query("MCEvent==71 and MCTrack==3")
+
+seglist = r.TObjArray()
+trackstodraw = r.TObjArray()
+
+ds=r.EdbDisplay("Display tracked and not tracked segments",-60000.,60000.,-50000.,50000.,-4000.,80000.)
+ds.SetDrawTracks(4)
+#opening track file, we need it if we want to access all linked tracks information, such as fitted segments
+trackfile = r.TFile.Open("b000001.{}.0.0.trk.root".format(nsection))
+tracktree = trackfile.Get("tracks")
+
+def drawsegments(selection):
+ '''draw segments from dataframe according to selection'''
+ #clear arrays for this event
+ seglist.Clear()
+ trackstodraw.Clear()
+ #applyselection for this event and loop over it
+ selecteddf = df.query(selection)
+ selecteddf = selecteddf.fillna(-1); #not tracked are labelled as -1 
+ for index, row in selecteddf.iterrows():
+  myseg = r.EdbSegP(int(row["ID"]),float(row["x"]),float(row["y"]),float(row["TX"]),float(row["TY"]))
+  trackID = int(row["TrackID"])
+  
+  if (trackID>=0):
+   tracktree.GetEntry(trackID)
+   origtrack = tracktree.t
+   segments = tracktree.s
+   fittedsegments = tracktree.sf
+
+   copiedtrack = r.EdbTrackP()
+   copiedtrack.Copy(origtrack)  
+  
+   #adding a copy of the track, adding segments
+   for (segment, fittedsegment) in zip(segments,fittedsegments):
+    segment.SetDZ(300)
+    fittedsegment.SetDZ(300)
+    copiedtrack.AddSegment(r.EdbSegP(segment))
+    copiedtrack.AddSegmentF(r.EdbSegP(fittedsegment))
+   copiedtrack.SetSegmentsTrack(copiedtrack.ID()) #track segments association
+   copiedtrack.SetCounters()
+   trackstodraw.Add(copiedtrack);
+  else:
+   #other segment information
+   myseg.SetDZ(300)
+   myseg.SetZ(float(row["z"]))
+   myseg.SetPID(int(row["PID"]))
+   #customized segment line (required to see the segments in new ROOT versions?)
+   mysegline = ds.SegLine(myseg)
+   mysegline.SetLineColor(r.kBlue)
+   mysegline.SetLineWidth(6)
+   seglist.Add(mysegline)
+
+ ds.SetArrSegG(seglist) #not setarrsegp, since I have customized the lines
+ ds.SetArrTr(trackstodraw)
+ ds.Draw()
+
+ return seglist
