@@ -24,10 +24,10 @@ firstplateset, lastplateset = GetSectionBorders(nsection)
 print("Processing Data Frame for section {}".format(nsection))
 #df = pd.read_csv("GSI1_S{}_standard.csv".format(nsection))
 df = pd.read_csv("GSI1_S{}.csv".format(nsection))
+df["Theta"] = np.arctan(np.sqrt(df["TX"] * df["TX"] + df["TY"] * df["TY"]))
 df["Plate"] = lastplateset - df["PID"] #getting plate by pID (we assume no plates are skipped)
 
 simdf = df.query("MCTrack>=0 or TrackID>=0") #segments tracked or from the simulation
-simdf["Theta"] = np.arctan(np.sqrt(simdf["TX"] * simdf["TX"] + simdf["TY"] * simdf["TY"]))
 
 nseg = simdf.groupby("TrackID").count()["ID"]
 nsegsamemc = simdf.groupby(["TrackID","MCEvent","MCTrack"]).count()["PID"] #associated to the true MC track
@@ -136,6 +136,40 @@ hefflength_nseg.Draw()
 ceffangle = r.TCanvas()
 myrootnp.fillprofile2D(heffangle,trackdf["Theta"],trackdf["efficiency"])
 heffangle.Draw()
+
+#angle of tracked and not tracked Monte Carlo segments
+hangletracked = r.TH1D("hangletracked","Theta of tracked MC segments",10,0,1)
+hanglemissed = r.TH1D("hanglemissed","Theta of missed MC segments",10,0,1)
+cthetatracking = r.TCanvas()
+
+htxtracked = r.TH1D("htxtracked","TX of tracked MC segments",20,-1,1)
+htxmissed = r.TH1D("htxmissed","TX of missed MC segments",20,-1,1)
+ctxtracking = r.TCanvas()
+
+htytracked = r.TH1D("htytracked","TY of tracked MC segments",20,-1,1)
+htymissed = r.TH1D("htymissed","TY of missed MC segments",20,-1,1)
+ctytracking = r.TCanvas()
+
+def comparetrackedsegments(variable,htracked,hmissed,canvas):
+ '''Tracked and not tracked segments comparison'''
+
+ myrootnp.fillhist1D(htracked, simdf.query("TrackID>=0")[variable])
+ myrootnp.fillhist1D(hmissed, simdf[simdf.isnull()["TrackID"]][variable]) #not tracked segments have TrackID NaN
+
+ htracked.Scale(1./htracked.Integral())
+ hmissed.Scale(1./hmissed.Integral())
+ hmissed.SetLineColor(r.kRed)
+
+ canvas.cd()
+ htracked.Draw("histo")
+ hmissed.Draw("SAMES and histo")
+ canvas.BuildLegend()
+
+comparetrackedsegments("Theta",hangletracked,hanglemissed,cthetatracking)
+comparetrackedsegments("TX",htxtracked,htxmissed,ctxtracking)
+comparetrackedsegments("TY",htytracked,htymissed,ctytracking)
+
+
 #csplitlength = r.TCanvas()
 #myrootnp.fillhist2D(hsplitlength,trackdf["nsegtrue"],nsplit)
 #hsplitlength.Draw("COLZ")
@@ -149,6 +183,16 @@ print(trackdf[["TrackID","MCEvent","MCTrack","nsegtrue","efficiency"]])
 print("len(trackdf) = {}".format(len(trackdf)))
 print("len(trackdf.query(nsegsamemc<nseg)) = {}".format(len(trackdf.query("nsegsamemc<nseg"))))
 
+#how many particles actually end before the end of the section?
+endingtracksdf = trackdf.query("LastPlate<{}".format(lastplateset))
+print("{} particles stop before the end of the section".format(len(endingtracksdf)))
+#where does track reconstruction actually stop, in this subsample
+endingtracksdf["missinglastplates"] = endingtracksdf.eval("LastPlate - lastplateMCTrack")
+
+hlastplates = r.TH1D("hlastplates","Reconstructed tracks stop N plates before the actual end of the particle;NPlates",6,0,6)
+clastplates = r.TCanvas()
+myrootnp.fillhist1D(hlastplates, endingtracksdf["missinglastplates"])
+hlastplates.Draw()
 
 #selecteddf = df.query("MCEvent==71 and MCTrack==3")
 
