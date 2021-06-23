@@ -211,7 +211,7 @@ def drawsegments(selection):
  seglist.Clear()
  trackstodraw.Clear()
  #applyselection for this event and loop over it
- selecteddf = df.query(selection)
+ selecteddf = df.query("MCEvent=={}".format(selection))
  selecteddf = selecteddf.fillna(-1); #not tracked are labelled as -1 
  for index, row in selecteddf.iterrows():
   myseg = r.EdbSegP(int(row["ID"]),float(row["x"]),float(row["y"]),float(row["TX"]),float(row["TY"]))
@@ -236,17 +236,15 @@ def drawsegments(selection):
    copiedtrack.SetCounters()
    trackstodraw.Add(copiedtrack);
   else:
-   #other segment information
+   #not tracked segments information
    myseg.SetDZ(300)
+   myseg.SetW(71) #required for line width
    myseg.SetZ(float(row["z"]))
    myseg.SetPID(int(row["PID"]))
-   #customized segment line (required to see the segments in new ROOT versions?)
-   mysegline = ds.SegLine(myseg)
-   mysegline.SetLineColor(r.kBlue)
-   mysegline.SetLineWidth(6)
-   seglist.Add(mysegline)
-
- ds.SetArrSegG(seglist) #not setarrsegp, since I have customized the lines
+   myseg.SetPlate(int(row["Plate"]))
+   myseg.SetMC(int(row["MCEvent"]),int(row["MCTrack"]))
+   seglist.Add(myseg)
+ ds.SetArrSegP(seglist)
  ds.SetArrTr(trackstodraw)
  ds.Draw()
 
