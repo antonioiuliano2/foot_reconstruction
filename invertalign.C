@@ -1,10 +1,13 @@
-//inverting affine transformations
-void invertalign(){
+/*inverting affine transformations (A.Iuliano 30 June 2021)
+nota bene: fromplate is defined as the starting plate in the current (available) transformation.
+For example, if you aligned from the last to the first, it will be the larger number (from plate =21, to plate=20)
+It will be created (or updated) an AFF file from 20 to 21*/
+void invertalign(int fromplate, int toplate, int setnumber = 1, int major = 0, int minor = 0){
  EdbScanProc *sproc = new EdbScanProc();
  sproc->eProcDirClient = "..";
  //currently available transformation
- int fromid[4] = {1,21,0,1000};
- int toid[4] = {1,20,0,1000};   
+ int fromid[4] = {setnumber,fromplate,major,minor};
+ int toid[4] = {setnumber,toplate,major,minor};   
  EdbAffine2D affine;
  float dz;
  //reading file with current aff file
