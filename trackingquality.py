@@ -8,14 +8,22 @@ import rootnumpy_myutils as myrootnp
 import sys
 '''launch with ipython -i trackinquality.py nsection'''
 nsection = sys.argv[1] #1,2, 3, 4,5,6,7
+addingtracks = True
+trackingverse = 1 #1 avanti (downstream), 0 indietro (upstream)
+trackingsuffix=""
 
 def GetSectionBorders(nsection):
    '''returns first and last plate of this section'''
-   setfile = r.TFile.Open("b000001.{}.0.0.set.root".format(nsection))
+   setfile = r.TFile.Open("b000001.{}.0.0.set{}.root".format(nsection,trackingsuffix))
    footset = setfile.Get("set")
    nplates = footset.eIDS.GetSize()
    lastplateset = footset.GetID(0).ePlate
    firstplateset = footset.GetID(nplates-1).ePlate
+   if trackingverse > 0:
+    #inverting first plate and last plate
+    temp = lastplateset
+    lastplateset = firstplateset
+    firstplateset = temp
    print("Opened set of section {}, first plate is {}, last plate is {}".format(nsection,firstplateset, lastplateset))
    return firstplateset, lastplateset
 
@@ -23,9 +31,20 @@ firstplateset, lastplateset = GetSectionBorders(nsection)
 
 print("Processing Data Frame for section {}".format(nsection))
 #df = pd.read_csv("GSI1_S{}_standard.csv".format(nsection))
-df = pd.read_csv("GSI1_S{}.csv".format(nsection))
+#df = pd.read_csv("GSI1_S{}{}.csv".format(nsection,trackingsuffix))
+df = pd.read_csv("GSI1.csv")
+
+if addingtracks:
+ dftracks = pd.read_csv("GSI1_tracks.csv",names=["index","TrackID"])
+ print("Starting track dataframe concatenation")
+ df = pd.concat([df,dftracks],axis=1)
+ print("Concatenated with tracking df")
+
 df["Theta"] = np.arctan(np.sqrt(df["TX"] * df["TX"] + df["TY"] * df["TY"]))
 df["Plate"] = lastplateset - df["PID"] #getting plate by pID (we assume no plates are skipped)
+if (trackingverse > 0):
+ df["Plate"] = firstplateset + df["PID"] #tracking downstream, PID 0 is the first one, not the last one
+
 
 simdf = df.query("MCTrack>=0 or TrackID>=0") #segments tracked or from the simulation
 
@@ -83,7 +102,7 @@ nsegsamemc = nsegsamemc.reset_index()
 lastplateMCTrack = lastplateMCTrack.reset_index()
 
 trackdf = trackdf.reset_index().merge(nsegtrue, how = "left", on = ["MCEvent","MCTrack"])
-trackdf = trackdf.reset_index().merge(nsegsamemc, how = "left", on = ["TrackID","MCEvent","MCTrack"])
+trackdf = trackdf.merge(nsegsamemc, how = "left", on = ["TrackID","MCEvent","MCTrack"])
 
 #renaming labels
 trackdf["PID"] = trackdf["PID_x"]
@@ -96,7 +115,7 @@ del trackdf["ID_x"]
 del trackdf["PID_y"]
 del trackdf["PID_x"]
 
-trackdf = trackdf.reset_index().merge(lastplateMCTrack, how = "left", on = ["MCEvent","MCTrack"])
+trackdf = trackdf.merge(lastplateMCTrack, how = "left", on = ["MCEvent","MCTrack"])
 trackdf["Plate"] = trackdf["Plate_x"]
 trackdf["lastplateMCTrack"] = trackdf["Plate_y"]
 
@@ -174,7 +193,7 @@ comparetrackedsegments("TY",htytracked,htymissed,ctytracking)
 #myrootnp.fillhist2D(hsplitlength,trackdf["nsegtrue"],nsplit)
 #hsplitlength.Draw("COLZ")
 #grouping by MCEvent for clarity
-trackdf = trackdf.sort_values("MCEvent")
+trackdf = trackdf.sort_values(["MCEvent","MCTrack"])
 
 #printing trackdf and some information
 print(trackdf[["TrackID","MCEvent","MCTrack","nsegtrue","efficiency"]])
@@ -202,7 +221,8 @@ trackstodraw = r.TObjArray()
 ds=r.EdbDisplay("Display tracked and not tracked segments",-60000.,60000.,-50000.,50000.,-4000.,80000.)
 ds.SetDrawTracks(4)
 #opening track file, we need it if we want to access all linked tracks information, such as fitted segments
-trackfile = r.TFile.Open("b000001.{}.0.0.trk.root".format(nsection))
+#trackfile = r.TFile.Open("b000001.{}.0.0.trk{}.root".format(nsection,trackingsuffix))
+trackfile = r.TFile.Open("b000001.0.1.7.trk.root")
 tracktree = trackfile.Get("tracks")
 
 def drawsegments(selection):
