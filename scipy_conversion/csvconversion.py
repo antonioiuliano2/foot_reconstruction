@@ -24,11 +24,11 @@ def applyconversion(nbrick,section):
  return df 
 
 #the two steps can now be done together, without an intermediate file
-
-df = applyconversion(1,0)
+NGSI = 2
+df = applyconversion(NGSI,0)
 
 #df = df.drop(columns = ["P","Flag"])
 #simfile = r.TFile.Open(sys.argv[2])
 #df = desy19.addtrueMCinfo(df,simfile, True)
 #df.to_csv('GSI1_S{}.csv'.format(nsection),index=False)
-df.to_csv('GSI1.csv',index=False)
+df.to_csv('GSI{}.csv'.format(NGSI),index=False)

@@ -245,6 +245,74 @@ def addtrueMCinfo(df,simfile, ship_charm):
  
  return df
 
+def addvertextrackindexes(df, vertexfilename):
+ '''adding track and vertex index to dataframe'''
+ vertexfile = r.TFile.Open(vertexfilename)
+ vrec = vertexfile.Get("EdbVertexRec")
+ vtxcontainer = vrec.eVTX
+ 
+ nvertices = vtxcontainer.GetEntries()
+
+ #initial empty arrays, to be filled with segments from all tracks
+ IDall = np.zeros(0,dtype=int)
+ PIDall = np.zeros(0,dtype=int)
+ TrackIDall = np.zeros(0,dtype=int)
+ VertexIDall = np.zeros(0,dtype=int)
+ #ID and PID do NOT identify unique segment in FOOT simulations, since signal and backgrounds are merged 
+ MCEventall = np.zeros(0,dtype=int)
+ MCTrackall = np.zeros(0,dtype=int)
+ print("start loop on {} vertices".format(vtxcontainer.GetEntries()))
+ for ivertex, vertex in enumerate (vtxcontainer):
+  ntracks = vertex.N()
+  for itrack in range(ntracks):
+   #getting track with index itrack
+   track = vertex.GetTrack(itrack)
+   nseg = track.N()
+
+   #initial arrays, length given by number of segments of this tracks
+   IDarr = np.zeros(nseg,dtype=int)
+   PIDarr = np.zeros(nseg,dtype=int)
+   TrackIDarr = np.zeros(nseg,dtype=int)
+   VertexIDarr = np.zeros(nseg,dtype=int)
+   #add true MC info
+   MCEventarr = np.zeros(nseg,dtype=int)
+   MCTrackarr = np.zeros(nseg,dtype=int)
+
+   #start loop on segments
+   for iseg in range(nseg):
+    seg = track.GetSegment(iseg)
+    IDarr[iseg] = seg.ID()
+    PIDarr[iseg] = seg.PID()
+    TrackIDarr[iseg] = track.Track() #seg.Track() may be the same for different tracks (also when selection is applied, use track.Track() for having the original track)
+    VertexIDarr[iseg] = ivertex #not vertexID (they are not the same in vertices_improved
+    #add true MC info
+    MCEventarr[iseg] = seg.MCEvt()
+    MCTrackarr[iseg] = seg.MCTrack()
+    
+    if(seg.MCEvt()==1 and seg.MCTrack()==3):
+     print("Found segment: ",seg.MCEvt(),seg.MCTrack(),seg.ID(), seg.PID(), track.Track(),ivertex)
+   
+   #concatenate, adding segments for this track to the global arrays
+   IDall = np.concatenate((IDall,IDarr),axis=0)
+   PIDall = np.concatenate((PIDall,PIDarr),axis=0)
+   TrackIDall = np.concatenate((TrackIDall,TrackIDarr),axis=0)
+   VertexIDall = np.concatenate((VertexIDall,VertexIDarr),axis=0)
+   #true MC info
+   MCEventall = np.concatenate((MCEventall,MCEventarr),axis=0)
+   MCTrackall = np.concatenate((MCTrackall,MCTrackarr),axis=0)
+
+ #end of loop, preparing dataframe
+ labels = ["ID","PID","TrackID","VertexID","MCEvent","MCTrack"]
+ dftracks = pd.DataFrame({"ID":IDall,"PID":PIDall,"TrackID":TrackIDall,"VertexID":VertexIDall,"MCEvent":MCEventall,"MCTrack":MCTrackall},columns = labels) 
+ print("Track dataframe ready: merging it with all couples dataframe: not tracked segments will be labelled as NA") 
+ #removing duplicates (same track can belong to more than one vertex, so the same segment can be filled multiple times)
+ dftracks = dftracks.groupby(["PID","ID","MCEvent","MCTrack"]).first()
+ dftracks = dftracks.reset_index()
+ #Now I need to merge them, however I want to keep all the segments, not only the ones which have been tracked. Luckily, there are many ways to do a merge (default is inner)
+ dfwithtracks = df.merge(dftracks,how = 'left', on=["PID","ID","MCEvent","MCTrack"])
+ return dfwithtracks
+ 
+
 def addtrackindex(df, trackfilename):
  ''' adding track index to dataframe, if tracking was performed'''
  trackfile = r.TFile.Open(trackfilename)
@@ -259,7 +327,7 @@ def addtrackindex(df, trackfilename):
  MCEventall = np.zeros(0,dtype=int)
  MCTrackall = np.zeros(0,dtype=int)
  print("start loop on {} tracks".format(tracktree.GetEntries()))
- for track in tracktree:
+ for itrack,track in enumerate(tracktree):
   nseg = track.nseg
   segments = track.s
 
@@ -275,7 +343,7 @@ def addtrackindex(df, trackfilename):
   for iseg, seg in enumerate(segments):
    IDarr[iseg] = seg.ID()
    PIDarr[iseg] = seg.PID()
-   TrackIDarr[iseg] = seg.Track()
+   TrackIDarr[iseg] = itrack #seg.Track() may be the same for different tracks
    #add true MC info
    MCEventarr[iseg] = seg.MCEvt()
    MCTrackarr[iseg] = seg.MCTrack()
