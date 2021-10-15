@@ -3,7 +3,7 @@ import pandas as pd
 import fedrarootlogon
 import ROOT as r
 
-def builddataframe(brick, path = "..", cutstring = "1", major = 0, minor = 0, newzprojection = None, charmsim = False):
+def builddataframe(brick, path = "..", cutstring = "1", major = 0, minor = 0, newzprojection = None, footsim = False):
  """build pandas dataframe starting from couples and scanset 
     brick = Number of brick as in b0000*
     path = input path to the folder containing theb b0000* folder
@@ -40,6 +40,7 @@ def builddataframe(brick, path = "..", cutstring = "1", major = 0, minor = 0, ne
  MCTrackall = np.zeros(0,dtype=int)
  Pall = np.zeros(0,dtype=np.float32)
  Flagall = np.zeros(0,dtype=int)
+ Weightall = np.zeros(0,dtype=np.float32)
 
  FirstPlateall = np.zeros(0,dtype=int) #added by Giuliana: where does the track end?
  LastPlateall = np.zeros(0,dtype=int)
@@ -83,6 +84,7 @@ def builddataframe(brick, path = "..", cutstring = "1", major = 0, minor = 0, ne
   MCTrackarray_plate = np.zeros(nsegcut,dtype=int)
   Parray_plate = np.zeros(nsegcut,dtype=np.float32)
   Flagarray_plate = np.zeros(nsegcut,dtype=int)
+  Weightarray_plate = np.zeros(nsegcut,dtype=np.float32)
 
   FirstPlatearray_plate = np.zeros(nsegcut,dtype=int)
   LastPlatearray_plate = np.zeros(nsegcut,dtype=int)
@@ -113,8 +115,9 @@ def builddataframe(brick, path = "..", cutstring = "1", major = 0, minor = 0, ne
    MCEvtarray_plate[ientry] = seg.MCEvt()
    MCTrackarray_plate[ientry] = seg.MCTrack()
    Parray_plate[ientry] = seg.P()     
-   if charmsim: #different place where pdgcode is stored
-    Flagarray_plate[ientry] = seg.Vid(0)
+   Weightarray_plate[ientry] = seg.W()     
+   if footsim: #different place where pdgcode is stored
+    Flagarray_plate[ientry] = seg.Aid(0)
    else:
     Flagarray_plate[ientry] = seg.Flag()
    
@@ -133,13 +136,15 @@ def builddataframe(brick, path = "..", cutstring = "1", major = 0, minor = 0, ne
   MCEvtall = np.concatenate((MCEvtall,MCEvtarray_plate),axis=0)
   MCTrackall = np.concatenate((MCTrackall,MCTrackarray_plate),axis=0)
   Pall = np.concatenate((Pall,Parray_plate),axis=0)
+  Weightall = np.concatenate((Weightall,Weightarray_plate),axis=0)
   Flagall = np.concatenate((Flagall,Flagarray_plate),axis=0)
 
   FirstPlateall = np.concatenate((FirstPlateall, FirstPlatearray_plate),axis=0)
   LastPlateall = np.concatenate((LastPlateall, LastPlatearray_plate),axis=0)
 
- data = {'ID':IDall,'PID':PIDall,'x':xall,'y':yall,'z':zall,'TX':TXall,'TY':TYall,'MCEvent':MCEvtall,'MCTrack':MCTrackall,'P':Pall,'Flag':Flagall, "FirstPlate":FirstPlateall,"LastPlate":LastPlateall}
- df = pd.DataFrame(data, columns = ['ID','PID','x','y','z','TX','TY','MCEvent','MCTrack','P','Flag',"FirstPlate","LastPlate"] )
+ data = {'ID':IDall,'PID':PIDall,'x':xall,'y':yall,'z':zall,'TX':TXall,'TY':TYall,'MCEvent':MCEvtall,'MCTrack':MCTrackall,'P':Pall,'Flag':Flagall, 
+'Weight':Weightall,  "FirstPlate":FirstPlateall,"LastPlate":LastPlateall}
+ df = pd.DataFrame(data, columns = ['ID','PID','x','y','z','TX','TY','MCEvent','MCTrack','P','Flag','Weight',"FirstPlate","LastPlate"] )
 
  return df
 
