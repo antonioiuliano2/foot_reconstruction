@@ -12,6 +12,8 @@ NGSI = sys.argv[1]
 addingtracks = True
 trackingverse = 1 #1 avanti (downstream), -1 indietro (upstream)
 trackingsuffix=""
+lastplatesections = [30,66,76,83,90,110,120]
+cutsection = 0 #section to inspect (0 = all): if section > 0 ANALYIZING ONLY PLATES FROM THAT SECTION!
 
 def GetSectionBorders():
    '''returns first and last plate of this section'''
@@ -34,9 +36,12 @@ print("Processing Data Frame for GSI {}".format(NGSI))
 #df = pd.read_csv("GSI1_S{}_standard.csv".format(nsection))
 #df = pd.read_csv("GSI1_S{}{}.csv".format(nsection,trackingsuffix))
 df = pd.read_csv("GSI{}_simonly.csv".format(NGSI)) #with background too it becomes too slow with all se 
+#adding charge as W() - 70
+df["ChargeW"] = df["Weight"]-70
 #adding information from track reconstruction, by concatenating the two dataframes
 if addingtracks:
- dftracks = pd.read_csv("GSI{}_tracks_vertices_simulationonly.csv".format(NGSI))
+ #dftracks = pd.read_csv("GSI{}_tracks_vertices_simulationonly.csv".format(NGSI))
+ dftracks = pd.read_csv("GSI{}_tracks_vertices_simulationonly_alltracks.csv".format(NGSI)) #also tracks not from vertexing!
  print("Starting track dataframe concatenation")
  df = pd.concat([df,dftracks],axis=1)
  print("Concatenated with tracking df")
@@ -46,6 +51,13 @@ df["Theta"] = np.arctan(np.sqrt(df["TX"] * df["TX"] + df["TY"] * df["TY"]))
 df["Plate"] = lastplateset - df["PID"] #getting plate by pID (we assume no plates are skipped)
 if (trackingverse > 0):
  df["Plate"] = firstplateset + df["PID"] #tracking downstream, PID 0 is the first one, not the last one
+
+#ANALYIZING ONLY PLATES FROM THAT SECTION!
+
+if cutsection==1:
+   df = df.query("Plate < {}".format(lastplatesections[cutsection-1]))
+elif cutsection > 1:
+   df = df.query("Plate > {} and Plate < {}".format(lastplatesections[cutsection-1],lastplatesections[cutsection]))
 
 
 simdf = df.query("MCTrack>=0 or TrackID>=0") #segments tracked or from the simulation
@@ -159,36 +171,55 @@ myrootnp.fillprofile2D(heffangle,trackdf["Theta"],trackdf["efficiency"])
 heffangle.Draw()
 
 #angle of tracked and not tracked Monte Carlo segments
+hanglestack = r.THStack("hanglestack","Theta comparison of tracking segments")
 hangletracked = r.TH1D("hangletracked","Theta of tracked MC segments",10,0,1)
 hanglemissed = r.TH1D("hanglemissed","Theta of missed MC segments",10,0,1)
 cthetatracking = r.TCanvas()
 
+hpdgstack = r.THStack("hpdgstack","PdgCode comparison of tracking segments")
+hpdgtracked = r.TH1D("hpdgtracked","PdgCode of tracked MC segments",10,-5,5)
+hpdgmissed = r.TH1D("hpdgmissed","PdgCode of missed MC segments",10,-5,5)
+cpdgtracking = r.TCanvas()
+
+hchargestack = r.THStack("hchargestack","Charge comparison of tracking segments")
+hchargetracked = r.TH1D("hchargetracked","Charge of tracked MC segments for S1",10,0,10)
+hchargemissed = r.TH1D("hchargemissed","Charge of missed MC segments for S1",10,0,10)
+cchargetracking = r.TCanvas()
+
+htxstack = r.THStack("htxstack","TX comparison of tracking segments")
 htxtracked = r.TH1D("htxtracked","TX of tracked MC segments",20,-1,1)
 htxmissed = r.TH1D("htxmissed","TX of missed MC segments",20,-1,1)
 ctxtracking = r.TCanvas()
 
+htystack = r.THStack("htystack","TY comparison of tracking segments")
 htytracked = r.TH1D("htytracked","TY of tracked MC segments",20,-1,1)
 htymissed = r.TH1D("htymissed","TY of missed MC segments",20,-1,1)
 ctytracking = r.TCanvas()
 
-def comparetrackedsegments(variable,htracked,hmissed,canvas):
+def comparetrackedsegments(variable,htracked,hmissed,hstack, canvas, normalize = False):
  '''Tracked and not tracked segments comparison'''
 
  myrootnp.fillhist1D(htracked, simdf.query("TrackID>=0")[variable])
  myrootnp.fillhist1D(hmissed, simdf[simdf.isnull()["TrackID"]][variable]) #not tracked segments have TrackID NaN
-
- htracked.Scale(1./htracked.Integral())
- hmissed.Scale(1./hmissed.Integral())
+ 
+ if (normalize):
+  htracked.Scale(1./htracked.Integral())
+  hmissed.Scale(1./hmissed.Integral())
+ 
  hmissed.SetLineColor(r.kRed)
 
+ hstack.Add(htracked)
+ hstack.Add(hmissed)
+ #drawing stacked histograms
  canvas.cd()
- htracked.Draw("histo")
- hmissed.Draw("SAMES and histo")
+ hstack.Draw()
  canvas.BuildLegend()
-
-comparetrackedsegments("Theta",hangletracked,hanglemissed,cthetatracking)
-comparetrackedsegments("TX",htxtracked,htxmissed,ctxtracking)
-comparetrackedsegments("TY",htytracked,htymissed,ctytracking)
+#filling histograms with comparison between tracked and missed segments
+comparetrackedsegments("Theta",hangletracked,hanglemissed,hanglestack,cthetatracking)
+comparetrackedsegments("TX",htxtracked,htxmissed,htxstack,ctxtracking)
+comparetrackedsegments("TY",htytracked,htymissed,htystack,ctytracking)
+comparetrackedsegments("Flag",hpdgtracked,hpdgmissed,hpdgstack,cpdgtracking)
+comparetrackedsegments("ChargeW",hchargetracked,hchargemissed,hchargestack,cchargetracking)
 
 
 #csplitlength = r.TCanvas()
@@ -298,8 +329,6 @@ def drawsegments(selection):
 
 trackeddf = simdf.query("TrackID>0")
 trackeddf = trackeddf.sort_values(["MCEvent","MCTrack","Plate"])
-
-lastplatesections = [30,66,76,83,90,110,120]
 
 trackeddf_S = []
 lastsegment_S = [] #first and last segment of the same MCTrack for each section
