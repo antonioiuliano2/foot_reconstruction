@@ -40,8 +40,8 @@ df = pd.read_csv("GSI{}_simonly.csv".format(NGSI)) #with background too it becom
 df["ChargeW"] = df["Weight"]-70
 #adding information from track reconstruction, by concatenating the two dataframes
 if addingtracks:
- #dftracks = pd.read_csv("GSI{}_tracks_vertices_simulationonly.csv".format(NGSI))
- dftracks = pd.read_csv("GSI{}_tracks_vertices_simulationonly_alltracks.csv".format(NGSI)) #also tracks not from vertexing!
+ dftracks = pd.read_csv("GSI{}_tracks_vertices_simulationonly.csv".format(NGSI))
+ #dftracks = pd.read_csv("GSI{}_tracks_vertices_simulationonly_alltracks.csv".format(NGSI)) #also tracks not from vertexing!
  print("Starting track dataframe concatenation")
  df = pd.concat([df,dftracks],axis=1)
  print("Concatenated with tracking df")
@@ -198,6 +198,8 @@ ctytracking = r.TCanvas()
 
 def comparetrackedsegments(variable,htracked,hmissed,hstack, canvas, normalize = False):
  '''Tracked and not tracked segments comparison'''
+
+ #cutsimdf = simdf.query("ChargeW != 8")
 
  myrootnp.fillhist1D(htracked, simdf.query("TrackID>=0")[variable])
  myrootnp.fillhist1D(hmissed, simdf[simdf.isnull()["TrackID"]][variable]) #not tracked segments have TrackID NaN
