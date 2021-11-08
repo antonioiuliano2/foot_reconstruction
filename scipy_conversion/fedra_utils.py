@@ -38,6 +38,7 @@ def builddataframe(brick, path = "..", cutstring = "1", major = 0, minor = 0, ne
 
  MCEvtall = np.zeros(0,dtype=int)
  MCTrackall = np.zeros(0,dtype=int)
+ MCMotherIDall = np.zeros(0,dtype=int)
  Pall = np.zeros(0,dtype=np.float32)
  Flagall = np.zeros(0,dtype=int)
  Weightall = np.zeros(0,dtype=np.float32)
@@ -82,6 +83,7 @@ def builddataframe(brick, path = "..", cutstring = "1", major = 0, minor = 0, ne
    
   MCEvtarray_plate = np.zeros(nsegcut,dtype=int)
   MCTrackarray_plate = np.zeros(nsegcut,dtype=int)
+  MCMotherIDarray_plate = np.zeros(nsegcut,dtype=int)
   Parray_plate = np.zeros(nsegcut,dtype=np.float32)
   Flagarray_plate = np.zeros(nsegcut,dtype=int)
   Weightarray_plate = np.zeros(nsegcut,dtype=np.float32)
@@ -114,6 +116,7 @@ def builddataframe(brick, path = "..", cutstring = "1", major = 0, minor = 0, ne
 
    MCEvtarray_plate[ientry] = seg.MCEvt()
    MCTrackarray_plate[ientry] = seg.MCTrack()
+   MCMotherIDarray_plate[ientry] = seg.Aid(1)
    Parray_plate[ientry] = seg.P()     
    Weightarray_plate[ientry] = seg.W()     
    if footsim: #different place where pdgcode is stored
@@ -135,6 +138,7 @@ def builddataframe(brick, path = "..", cutstring = "1", major = 0, minor = 0, ne
   TYall = np.concatenate((TYall,TYarray_plate),axis=0)
   MCEvtall = np.concatenate((MCEvtall,MCEvtarray_plate),axis=0)
   MCTrackall = np.concatenate((MCTrackall,MCTrackarray_plate),axis=0)
+  MCMotherIDall = np.concatenate((MCMotherIDall,MCMotherIDarray_plate),axis=0)
   Pall = np.concatenate((Pall,Parray_plate),axis=0)
   Weightall = np.concatenate((Weightall,Weightarray_plate),axis=0)
   Flagall = np.concatenate((Flagall,Flagarray_plate),axis=0)
@@ -142,9 +146,9 @@ def builddataframe(brick, path = "..", cutstring = "1", major = 0, minor = 0, ne
   FirstPlateall = np.concatenate((FirstPlateall, FirstPlatearray_plate),axis=0)
   LastPlateall = np.concatenate((LastPlateall, LastPlatearray_plate),axis=0)
 
- data = {'ID':IDall,'PID':PIDall,'x':xall,'y':yall,'z':zall,'TX':TXall,'TY':TYall,'MCEvent':MCEvtall,'MCTrack':MCTrackall,'P':Pall,'Flag':Flagall, 
+ data = {'ID':IDall,'PID':PIDall,'x':xall,'y':yall,'z':zall,'TX':TXall,'TY':TYall,'MCEvent':MCEvtall,'MCTrack':MCTrackall,'MCMotherID':MCMotherIDall,'P':Pall,'Flag':Flagall, 
 'Weight':Weightall,  "FirstPlate":FirstPlateall,"LastPlate":LastPlateall}
- df = pd.DataFrame(data, columns = ['ID','PID','x','y','z','TX','TY','MCEvent','MCTrack','P','Flag','Weight',"FirstPlate","LastPlate"] )
+ df = pd.DataFrame(data, columns = ['ID','PID','x','y','z','TX','TY','MCEvent','MCTrack','MCMotherID','P','Flag','Weight',"FirstPlate","LastPlate"] )
 
  return df
 
